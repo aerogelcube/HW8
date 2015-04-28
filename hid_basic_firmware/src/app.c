@@ -308,25 +308,6 @@ void APP_Tasks (void )
             {
                 /* Look at the data the host sent, to see what
                  * kind of application specific command it sent. */
-                 /*
-                printOLED('H',4,0);
-                char row = appData.receiveDataBuffer[0];
-                printOLED(row, 4, 0);
-                
-                appData.transmitDataBuffer[0] = 0;
-                appData.transmitDataBuffer[1] = 't';
-                appData.transmitDataBuffer[2] = row;
-
-                appData.hidDataTransmitted = false;
-                // Prepare the USB module to send the data packet to the host
-                USB_DEVICE_HID_ReportSend (USB_DEVICE_HID_INDEX_0,
-                        &appData.txTransferHandle, appData.transmitDataBuffer, 64 );
-
-                appData.hidDataReceived = false;
-                // Place a new read request.
-                USB_DEVICE_HID_ReportReceive (USB_DEVICE_HID_INDEX_0,
-                        &appData.rxTransferHandle, appData.receiveDataBuffer, 64 );
-                */
                 
                 switch(appData.receiveDataBuffer[0])
                 {
@@ -335,10 +316,27 @@ void APP_Tasks (void )
                         //keep in mind that receiveDataBuffer doesn't take the first byte
                         //of the HID buffer, so the indices are shifted. receiveDataBuffer[1]
                         //takes the value of buf[2]!
-                        int row = receiveDataBuffer[1];    
+
+                        //row should not be > 64; else will fall off screen!
+                        int row = receiveDataBuffer[1];
+                        char check = receiveDataBuffer[2];
+                        char check1 = receiveDataBuffer[3];
+                        
+                        
+                        char ones = (row%10)+'0';
+                        char tens = row/10 + '0';
                         display_clear();
 
-                        printOLED(row,row,0);
+                        //printOLED(check,row,0);
+                        //printOLED(ones,row,5);
+                        
+                        int i;
+                        for (i = 0; i < 25; i++)
+                        {
+                            char check = receiveDataBuffer[i+2];
+                            printOLED(check,row,5*i);
+                        }
+                        
 
                         //transmit buffer has the same indices as buffer of HID
                         appData.transmitDataBuffer[1] = row;
