@@ -319,16 +319,16 @@ void APP_Tasks (void )
 
                         //row should not be > 64; else will fall off screen!
                         int row = receiveDataBuffer[1];
-                        char check = receiveDataBuffer[2];
-                        char check1 = receiveDataBuffer[3];
-                        
-                        
-                        char ones = (row%10)+'0';
-                        char tens = row/10 + '0';
                         display_clear();
 
-                        //printOLED(check,row,0);
-                        //printOLED(ones,row,5);
+                        /*
+                        char check = receiveDataBuffer[2];
+                        char check1 = receiveDataBuffer[3];
+                        char ones = (row%10)+'0';
+                        char tens = row/10 + '0';
+                        printOLED(check,row,0);
+                        printOLED(ones,row,5);
+                        */
                         
                         int i;
                         for (i = 0; i < 25; i++)
@@ -337,7 +337,7 @@ void APP_Tasks (void )
                             printOLED(check,row,5*i);
                         }
                         
-
+                        
                         //transmit buffer has the same indices as buffer of HID
                         appData.transmitDataBuffer[1] = row;
                         
@@ -355,35 +355,67 @@ void APP_Tasks (void )
                     }
                     case 0x81:
                     {
-                        if(appData.hidDataTransmitted)
+                        //Accel axes
+                        short accels[3]; // accelerations for the 3 axes
+                        short mags[3]; // magnetometer readings for the 3 axes
+                        short temp;
+
+                        unsigned int elapsedticks = _CP0_GET_COUNT(); // read the core timer
+                        //unsigned int elapsedns = elapsedticks * 50; // duration in ns, for 80 MHz SYSCLK
+                        if (elapsedticks > 200000) //200000
                         {
-                            // Echo back to the host PC the command we are fulfilling in
-                            // the first byte.  In this case, the Get Push-button State
-                            // command.
 
-                            appData.transmitDataBuffer[0] = 0x81;
+                            // read the accelerometer from all three axes
+                            // the accelerometer and the pic32 are both little endian by default
+                            //(the lowest address has the LSB)
+                            // the accelerations are 16-bit twos compliment numbers, the same as a short
+                            acc_read_register(OUT_X_L_A, (unsigned char *) accels, 6);
+                            // need to read all 6 bytes in one transaction to get an update.
+                            acc_read_register(OUT_X_L_M, (unsigned char *) mags, 6);
+                            // read the temperature data. Its a right justified 12 bit two's compliment number
+                            acc_read_register(TEMP_OUT_L, (unsigned char *) &temp, 2);
 
-                            if( BSP_SwitchStateGet(APP_USB_SWITCH_1) == BSP_SWITCH_STATE_PRESSED )
+                            char data[25];
+                            sprintf(data, "%3.2f,%3.2f,%3.2f", accels[0]/16000.0,accels[1]/16000.0,accels[2]/16000.0);
+                            //keep in mind that receiveDataBuffer doesn't take the first byte
+                            //of the HID buffer, so the indices are shifted. receiveDataBuffer[1]
+                            //takes the value of buf[2]!
+
+                            int i=0;
+                            while(data[i])
                             {
-                                appData.transmitDataBuffer[1] = 0x00;
+                                printOLED(data[i],28,5*i);
+                                i++;
                             }
-                            else
-                            {
-                                appData.transmitDataBuffer[1] = 0x01;
-                            }
-
-                            appData.hidDataTransmitted = false;
-
-                            // Prepare the USB module to send the data packet to the host
-                            USB_DEVICE_HID_ReportSend (USB_DEVICE_HID_INDEX_0,
-                                    &appData.txTransferHandle, appData.transmitDataBuffer, 64 );
-
-                            appData.hidDataReceived = false;
-
-                            // Place a new read request.
-                            USB_DEVICE_HID_ReportReceive (USB_DEVICE_HID_INDEX_0,
-                                    &appData.rxTransferHandle, appData.receiveDataBuffer, 64 );
+                            
+                            appData.transmitDataBuffer[1] = 1;
+                            //x
+                            appData.transmitDataBuffer[2] = accels[0] >> 8;
+                            appData.transmitDataBuffer[3] = accels[0] & 0xFF;
+                            //y
+                            appData.transmitDataBuffer[4] = accels[1] >> 8;
+                            appData.transmitDataBuffer[5] = accels[1] & 0xFF;
+                            //z
+                            appData.transmitDataBuffer[6] = accels[2] >> 8;
+                            appData.transmitDataBuffer[7] = accels[2] & 0xFF;
+                            //transmit buffer has the same indices as buffer of HID
+                            _CP0_SET_COUNT(0);
                         }
+                        else
+                        {
+                            appData.transmitDataBuffer[1] = 0;
+                            
+                        }
+                        
+                        appData.hidDataTransmitted = false;
+                        // Prepare the USB module to send the data packet to the host
+                        USB_DEVICE_HID_ReportSend (USB_DEVICE_HID_INDEX_0,
+                                &appData.txTransferHandle, appData.transmitDataBuffer, 64 );
+
+                        appData.hidDataReceived = false;
+                        // Place a new read request.
+                        USB_DEVICE_HID_ReportReceive (USB_DEVICE_HID_INDEX_0,
+                                &appData.rxTransferHandle, appData.receiveDataBuffer, 64 );
                         break;
                     }
                     default:

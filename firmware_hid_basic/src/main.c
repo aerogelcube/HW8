@@ -92,12 +92,7 @@ int main ( void )
     while(delay<4000) {
         delay++;
     }
-
-    //ACCELEROMETER
-    short accels[3]; // accelerations for the 3 axes
-    short mags[3]; // magnetometer readings for the 3 axes
-    short temp;
-
+    
     display_init();
     display_clear();
     while ( true )
